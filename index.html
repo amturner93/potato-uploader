@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Frame Uploader</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white;
+      color: black;
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      padding: 1.5rem;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+    }
+    canvas {
+      max-width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 0.5rem;
+      margin-top: 1rem;
+    }
+    button {
+      margin: 0.5rem;
+      padding: 0.7rem 1.2rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: #667eea;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #556cd6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Photo Frame Uploader</h1>
+    <input type="file" id="fileInput" accept="image/*" />
+    <div>
+      <button id="toggleFrame">Switch Frame (Portrait/Landscape)</button>
+      <button id="rotateImage">Rotate Image</button>
+    </div>
+    <canvas id="previewCanvas" width="800" height="480"></canvas>
+    <div>
+      <button id="uploadButton">Upload</button>
+    </div>
+  </div>
+
+  <script>
+    // Grab PAT from URL hash
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const pat = hashParams.get("pat");
+
+    if (pat) {
+      console.log("PAT loaded from hash");
+      // clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      alert("No PAT provided in URL hash (#pat=...)");
+    }
+
+    const canvas = document.getElementById("previewCanvas");
+    const ctx = canvas.getContext("2d");
+    let img = null;
+    let rotation = 0;
+    let isPortraitFrame = false;
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // adjust canvas dimensions for frame orientation
+      canvas.width = isPortraitFrame ? 480 : 800;
+      canvas.height = isPortraitFrame ? 800 : 480;
+
+      if (!img) return;
+
+      // Calculate scaled size to fit
+      const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+      const newW = img.width * scale;
+      const newH = img.height * scale;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(img, -newW / 2, -newH / 2, newW, newH);
+      ctx.restore();
+    }
+
+    document.getElementById("fileInput").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        img = new Image();
+        img.onload = draw;
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("toggleFrame").addEventListener("click", () => {
+      isPortraitFrame = !isPortraitFrame;
+      draw();
+    });
+
+    document.getElementById("rotateImage").addEventListener("click", () => {
+      rotation = (rotation + 90) % 360;
+      draw();
+    });
+
+    async function uploadToGitHub(file, pat) {
+      const repoOwner = "aturner93";   // TODO: replace
+      const repoName = "special-potato";        // TODO: replace
+      const filePath = "babe.jpg";    // fixed name for frame
+      const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
+      // Convert file to base64
+      const content = await file.arrayBuffer();
+      const base64Content = btoa(
+        new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), "")
+      );
+
+      // First, check if file exists to get its SHA
+      let sha = null;
+      const checkResp = await fetch(apiUrl, {
+        headers: { "Authorization": `token ${pat}` }
+      });
+      if (checkResp.ok) {
+        const fileInfo = await checkResp.json();
+        sha = fileInfo.sha;
+      }
+
+      // Now upload (new file or overwrite if sha is set)
+      const resp = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${pat}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "Update photo frame image",
+          content: base64Content,
+          sha: sha || undefined
+        }),
+      });
+
+      if (!resp.ok) {
+        const error = await resp.json();
+        throw new Error(error.message || "Upload failed");
+      }
+      alert("Upload successful!");
+    }
+
+    document.getElementById("uploadButton").addEventListener("click", async () => {
+      if (!img) return alert("No image selected");
+      if (!pat) return alert("Missing PAT in URL");
+
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+      if (!file) return alert("Select a file first");
+
+      try {
+        await uploadToGitHub(file, pat);
+      } catch (e) {
+        alert("Upload error: " + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

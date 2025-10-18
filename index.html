@@ -52,8 +52,8 @@
     <h1>Photo Frame Uploader</h1>
     <input type="file" id="fileInput" accept="image/*" />
     <div>
-      <button id="toggleFrame">Switch Frame (Portrait/Landscape)</button>
-      <button id="rotateImage">Rotate Image</button>
+      <!-- <button id="toggleFrame">Switch Frame (Portrait/Landscape)</button> -->
+      <!-- <button id="rotateImage">Rotate Image</button> -->
     </div>
     <canvas id="previewCanvas" width="800" height="480"></canvas>
     <div>
@@ -65,6 +65,7 @@
     // Grab PAT from URL hash
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const pat = hashParams.get("pat");
+    const person = hashParams.get("person");
 
     if (pat) {
       console.log("PAT loaded from hash");
@@ -78,14 +79,14 @@
     const ctx = canvas.getContext("2d");
     let img = null;
     let rotation = 0;
-    let isPortraitFrame = false;
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let isPortraitFrame = img.width < img.height;
 
       // adjust canvas dimensions for frame orientation
-      canvas.width = isPortraitFrame ? 480 : 800;
-      canvas.height = isPortraitFrame ? 800 : 480;
+      canvas.width = isPortraitFrame ? 600 : 1024;
+      canvas.height = isPortraitFrame ? 1024 : 600;
 
       if (!img) return;
 
@@ -113,20 +114,20 @@
       reader.readAsDataURL(file);
     });
 
-    document.getElementById("toggleFrame").addEventListener("click", () => {
-      isPortraitFrame = !isPortraitFrame;
-      draw();
-    });
+    // document.getElementById("toggleFrame").addEventListener("click", () => {
+    //   isPortraitFrame = !isPortraitFrame;
+    //   draw();
+    // });
 
-    document.getElementById("rotateImage").addEventListener("click", () => {
-      rotation = (rotation + 90) % 360;
-      draw();
-    });
+    // document.getElementById("rotateImage").addEventListener("click", () => {
+    //   rotation = (rotation + 90) % 360;
+    //   draw();
+    // });
 
     async function uploadToGitHub(file, pat) {
-      const repoOwner = "aturner93";   // TODO: replace
-      const repoName = "special-potato";        // TODO: replace
-      const filePath = "babe.jpg";    // fixed name for frame
+      const repoOwner = "aturner93"; 
+      const repoName = "special-potato"; 
+      const filePath = `${person}.jpg`; 
       const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
       // Convert file to base64
       const content = await file.arrayBuffer();
